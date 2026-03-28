@@ -76,6 +76,8 @@ public class ProductService : IProductService
         Description = p.Description,
         Price = p.Price,
         StockQuantity = p.StockQuantity,
+        ReservedQuantity = p.ReservedQuantity,
+        AvailableQuantity = p.StockQuantity - p.ReservedQuantity,
         Brand = p.Brand,
         CategoryId = p.CategoryId,
         CategoryName = p.Category?.Name

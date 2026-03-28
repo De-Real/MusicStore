@@ -1,14 +1,13 @@
+using MusicStore.Domain.Entities;
+
 namespace MusicStore.Application.DTOs.Customer;
 
-public class CustomerResponseDto
+public class UpdateCustomerDto
 {
-    public int Id { get; set; }
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
-    public string FullName => $"{FirstName} {LastName}";
     public string Email { get; set; } = string.Empty;
     public string? Phone { get; set; }
     public string? Address { get; set; }
-    public string LoyaltyTier { get; set; } = string.Empty;
-    public decimal TotalSpent { get; set; }
+    public LoyaltyTier LoyaltyTier { get; set; }
 }

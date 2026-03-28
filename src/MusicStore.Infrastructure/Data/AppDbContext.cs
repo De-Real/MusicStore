@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+    public DbSet<Promotion> Promotions => Set<Promotion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +45,7 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.Email).IsUnique();
             entity.Property(e => e.Phone).HasMaxLength(20);
             entity.Property(e => e.Address).HasMaxLength(500);
+            entity.Property(e => e.TotalSpent).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<Order>(entity =>
@@ -59,7 +61,11 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<OrderItem>(entity =>
         {
             entity.HasKey(e => e.Id);
+            entity.Property(e => e.OriginalUnitPrice).HasPrecision(18, 2);
             entity.Property(e => e.UnitPrice).HasPrecision(18, 2);
+            entity.Property(e => e.TierDiscountPercent).HasPrecision(5, 2);
+            entity.Property(e => e.BulkDiscountPercent).HasPrecision(5, 2);
+            entity.Property(e => e.PromoDiscountPercent).HasPrecision(5, 2);
             entity.HasOne(e => e.Order)
                   .WithMany(o => o.OrderItems)
                   .HasForeignKey(e => e.OrderId)
@@ -68,6 +74,19 @@ public class AppDbContext : DbContext
                   .WithMany(p => p.OrderItems)
                   .HasForeignKey(e => e.ProductId)
                   .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Promotion>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.DiscountPercent).HasPrecision(5, 2);
+            entity.HasOne(e => e.Category)
+                  .WithMany()
+                  .HasForeignKey(e => e.CategoryId)
+                  .OnDelete(DeleteBehavior.Restrict)
+                  .IsRequired(false);
         });
     }
 }

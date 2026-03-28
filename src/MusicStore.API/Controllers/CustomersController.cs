@@ -39,4 +39,18 @@ public class CustomersController : ControllerBase
             return Conflict(new { message = ex.Message });
         }
     }
+
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<CustomerResponseDto>> Update(int id, UpdateCustomerDto dto)
+    {
+        try
+        {
+            var updated = await _customerService.UpdateAsync(id, dto);
+            return updated is null ? NotFound() : Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
 }

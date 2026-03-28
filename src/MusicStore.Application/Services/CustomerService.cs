@@ -37,9 +37,31 @@ public class CustomerService : ICustomerService
             LastName = dto.LastName,
             Email = dto.Email,
             Phone = dto.Phone,
-            Address = dto.Address
+            Address = dto.Address,
+            LoyaltyTier = dto.LoyaltyTier
         };
         await _customerRepository.AddAsync(customer);
+        await _customerRepository.SaveChangesAsync();
+        return MapToResponse(customer);
+    }
+
+    public async Task<CustomerResponseDto?> UpdateAsync(int id, UpdateCustomerDto dto)
+    {
+        var customer = await _customerRepository.GetByIdAsync(id);
+        if (customer is null) return null;
+
+        if (!string.Equals(customer.Email, dto.Email, StringComparison.OrdinalIgnoreCase)
+            && await _customerRepository.EmailExistsAsync(dto.Email))
+            throw new InvalidOperationException($"A customer with email '{dto.Email}' already exists.");
+
+        customer.FirstName = dto.FirstName;
+        customer.LastName = dto.LastName;
+        customer.Email = dto.Email;
+        customer.Phone = dto.Phone;
+        customer.Address = dto.Address;
+        customer.LoyaltyTier = dto.LoyaltyTier;
+
+        _customerRepository.Update(customer);
         await _customerRepository.SaveChangesAsync();
         return MapToResponse(customer);
     }
@@ -51,6 +73,8 @@ public class CustomerService : ICustomerService
         LastName = c.LastName,
         Email = c.Email,
         Phone = c.Phone,
-        Address = c.Address
+        Address = c.Address,
+        LoyaltyTier = c.LoyaltyTier.ToString(),
+        TotalSpent = c.TotalSpent
     };
 }
