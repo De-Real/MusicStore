@@ -54,6 +54,7 @@ public class OrderService : IOrderService
 
             var now = DateTime.UtcNow;
             var orderItems = new List<OrderItem>();
+            Console.WriteLine($"[LOG] Створюється замовлення для CustomerId={dto.CustomerId} з {dto.Items.Count} товарами");
             decimal discountedTotal = 0;
 
             foreach (var itemDto in dto.Items)
