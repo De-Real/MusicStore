@@ -1,8 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using MusicStore.Application.Common;
 using MusicStore.Application.Interfaces;
+using MusicStore.Application.Orders.Commands;
+using MusicStore.Application.Orders.EventHandlers;
 using MusicStore.Application.Services;
+using MusicStore.Domain.Events;
 using MusicStore.Domain.Interfaces;
 using MusicStore.Infrastructure.Data;
+using MusicStore.Infrastructure.Events;
 using MusicStore.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +31,13 @@ builder.Services.AddScoped<IPromotionRepository, PromotionRepository>();
 
 // Unit of Work
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// Domain Events
+builder.Services.AddScoped<IDomainEventDispatcher, InMemoryDomainEventDispatcher>();
+builder.Services.AddScoped<IDomainEventHandler<OrderCreatedEvent>, OrderCreatedEventHandler>();
+
+// Command Handlers
+builder.Services.AddScoped<CreateOrderCommandHandler>();
 
 // Services
 builder.Services.AddScoped<IProductService, ProductService>();
