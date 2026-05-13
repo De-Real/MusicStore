@@ -1,3 +1,74 @@
+# Практична робота №4
+## Тактичний Domain-Driven Design: Реалізація Use Case створення замовлення
+
+---
+
+## Value Objects
+
+### `Money` (`Domain/ValueObjects/Money.cs`)
+Represents a monetary amount with currency. Immutable record.
+
+- **Validation**: amount must be ≥ 0; currency must be non-empty
+- **Factory**: `Money.Create(decimal amount, string currency)`
+- **Used in**: `Order.TotalPrice` (mapped to `TotalAmount` + `TotalCurrency` columns via EF Core owned entity)
+
+### `Address` (`Domain/ValueObjects/Address.cs`)
+Represents a delivery address. Immutable record.
+
+- **Validation**: Street, City, Country must be non-empty
+- **Factory**: `Address.Create(string street, string city, string country, string? postalCode)`
+- **Used in**: `Order.ShippingAddress` (mapped to `ShippingAddress*` columns via EF Core owned entity)
+
+---
+
+## Aggregate Root — Order
+
+`Order` (`Domain/Entities/Order.cs`) extends `AggregateRoot`.
+
+- **No public setters** — state changes only through methods
+- `Order.Create(customerId, customer, shippingAddress?)` — factory method
+- `Order.AddItem(...)` — validates quantity, adds `OrderItem`, recalculates `TotalPrice`
+- `Order.Place()` — validates order is non-empty, raises `OrderCreatedEvent`
+- `Order.ChangeStatus(OrderStatus)` — enforces the valid state machine (Pending→Confirmed→Shipped→Delivered / Cancelled); throws `InvalidOperationException` on invalid transition
+- `Order.GetAllowedTransitions()` — returns allowed next statuses (used by API response)
+
+---
+
+## Domain Events & Dispatcher
+
+### Event: `OrderCreatedEvent` (`Domain/Events/OrderCreatedEvent.cs`)
+Raised inside `Order.Place()`. Holds a reference to the `Order` aggregate so the handler can read the DB-assigned Id after persistence.
+
+### Dispatcher: `InMemoryDomainEventDispatcher` (`Infrastructure/Events/InMemoryDomainEventDispatcher.cs`)
+Resolves `IDomainEventHandler<TEvent>` from the DI container and invokes them.
+
+**Dispatch flow:**
+1. `AppDbContext.SaveChangesAsync` collects aggregates with pending events **before** calling `base.SaveChangesAsync`
+2. `base.SaveChangesAsync` runs — database assigns real IDs
+3. `InMemoryDomainEventDispatcher.DispatchAndClearAsync` fires all handlers (by this point `Order.Id` is the real DB value)
+
+### Handler: `OrderCreatedEventHandler` (`Application/Orders/EventHandlers/OrderCreatedEventHandler.cs`)
+Implements `IDomainEventHandler<OrderCreatedEvent>`. Logs:
+```
+[Domain Event] Order #42 created for Customer #7. Total: 1250.00 UAH
+```
+Side effects (logging, emails, etc.) are kept out of the aggregate and executed only through handlers.
+
+---
+
+## Use Case: CreateOrderCommandHandler
+
+`CreateOrderCommandHandler` (`Application/Orders/Commands/CreateOrderCommandHandler.cs`) orchestrates order creation:
+
+1. Loads customer and validates existence
+2. Builds `Address` VO from optional command fields
+3. Calls `Order.Create(...)` — produces a new aggregate
+4. Per item: loads product, checks stock, calculates price via `PricingCalculator`, calls `Order.AddItem(...)` with `Money` VOs
+5. Calls `Order.Place()` — raises `OrderCreatedEvent` inside the aggregate
+6. Persists via repository; `SaveChangesAsync` override dispatches the event automatically
+
+---
+
 # Практична робота №3  
 ## Стратегічний Domain-Driven Design: Аналіз домену та проектування меж  
 ## Проєкт: MusicStore

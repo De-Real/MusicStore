@@ -1,11 +1,19 @@
 using Microsoft.EntityFrameworkCore;
+using MusicStore.Application.Common;
+using MusicStore.Domain.Common;
 using MusicStore.Domain.Entities;
 
 namespace MusicStore.Infrastructure.Data;
 
 public class AppDbContext : DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    private readonly IDomainEventDispatcher _dispatcher;
+
+    public AppDbContext(DbContextOptions<AppDbContext> options, IDomainEventDispatcher dispatcher)
+        : base(options)
+    {
+        _dispatcher = dispatcher;
+    }
 
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Product> Products => Set<Product>();
@@ -13,6 +21,21 @@ public class AppDbContext : DbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<Promotion> Promotions => Set<Promotion>();
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        var aggregatesWithEvents = ChangeTracker.Entries<AggregateRoot>()
+            .Where(e => e.Entity.DomainEvents.Any())
+            .Select(e => e.Entity)
+            .ToList();
+
+        var result = await base.SaveChangesAsync(cancellationToken);
+
+        if (aggregatesWithEvents.Count > 0)
+            await _dispatcher.DispatchAndClearAsync(aggregatesWithEvents, cancellationToken);
+
+        return result;
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,7 +74,38 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Order>(entity =>
         {
             entity.HasKey(e => e.Id);
-            entity.Property(e => e.TotalAmount).HasPrecision(18, 2);
+
+            entity.OwnsOne(e => e.TotalPrice, money =>
+            {
+                money.Property(m => m.Amount)
+                     .HasColumnName("TotalAmount")
+                     .HasPrecision(18, 2);
+                money.Property(m => m.Currency)
+                     .HasColumnName("TotalCurrency")
+                     .HasMaxLength(3)
+                     .HasDefaultValue("UAH");
+            });
+
+            entity.OwnsOne(e => e.ShippingAddress, addr =>
+            {
+                addr.Property(a => a.Street)
+                    .HasColumnName("ShippingAddressStreet")
+                    .HasMaxLength(200);
+                addr.Property(a => a.City)
+                    .HasColumnName("ShippingAddressCity")
+                    .HasMaxLength(100);
+                addr.Property(a => a.Country)
+                    .HasColumnName("ShippingAddressCountry")
+                    .HasMaxLength(100);
+                addr.Property(a => a.PostalCode)
+                    .HasColumnName("ShippingAddressPostalCode")
+                    .HasMaxLength(20);
+            });
+
+            entity.Navigation(e => e.OrderItems)
+                  .HasField("_orderItems")
+                  .UsePropertyAccessMode(PropertyAccessMode.Field);
+
             entity.HasOne(e => e.Customer)
                   .WithMany(c => c.Orders)
                   .HasForeignKey(e => e.CustomerId)

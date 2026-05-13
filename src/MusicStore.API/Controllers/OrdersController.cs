@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MusicStore.Application.DTOs.Order;
 using MusicStore.Application.Interfaces;
+using MusicStore.Application.Orders.Commands;
 
 namespace MusicStore.API.Controllers;
 
@@ -9,10 +10,12 @@ namespace MusicStore.API.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly IOrderService _orderService;
+    private readonly CreateOrderCommandHandler _createOrderHandler;
 
-    public OrdersController(IOrderService orderService)
+    public OrdersController(IOrderService orderService, CreateOrderCommandHandler createOrderHandler)
     {
         _orderService = orderService;
+        _createOrderHandler = createOrderHandler;
     }
 
     [HttpGet]
@@ -35,7 +38,18 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var created = await _orderService.CreateAsync(dto);
+            var command = new CreateOrderCommand(
+                dto.CustomerId,
+                dto.Items.Select(i => new CreateOrderItemCommand(i.ProductId, i.Quantity)).ToList(),
+                dto.AddressStreet is not null
+                    ? new CreateOrderAddressCommand(
+                        dto.AddressStreet,
+                        dto.AddressCity ?? string.Empty,
+                        dto.AddressCountry ?? string.Empty,
+                        dto.AddressPostalCode)
+                    : null);
+
+            var created = await _createOrderHandler.HandleAsync(command);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
         catch (InvalidOperationException ex)
